@@ -1,0 +1,37 @@
+enabled: true
+rules:
+  - id: custom-boundary-rule
+    name: Custom Boundary Rule
+    description: Describe your custom boundary rule
+    enabled: true
+    boundaryType: layer
+    sourcePattern: src/your-pattern/**
+    targetRestriction:
+      allowed:
+        - src/allowed/**
+      forbidden:
+        - src/forbidden/**
+      requireExplicit: false
+    severity: medium
+    exceptions:
+      - allowed-exception
+    tags:
+      - custom
+externalDependencies:
+  allowedPackages:
+    - react
+    - axios
+  forbiddenPackages:
+    - deprecated-package
+  requireVersionPinning: true
+  allowedDomains:
+    - npmjs.com
+circularDependencyDetection:
+  enabled: true
+  maxDepth: 10
+  ignorePatterns:
+    - '**/*.test.*'
+reporting:
+  includeAllowedImports: false
+  groupByFile: true
+  includeDependencyGraph: false

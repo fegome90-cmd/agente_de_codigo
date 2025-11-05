@@ -1,0 +1,91 @@
+{
+  "name": "pit-crew-multi-agent",
+  "version": "1.0.0",
+  "description": "Multi-Agent Code Review System - F1 Pit Stop Architecture with LangGraph Orchestration",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm --filter orchestrator dev",
+    "start": "pnpm --filter orchestrator start",
+    "build": "pnpm -r build",
+    "test": "./scripts/run-tests.sh",
+    "test:unit": "./scripts/run-tests.sh --unit",
+    "test:integration": "./scripts/run-tests.sh --integration",
+    "test:e2e": "./scripts/run-tests.sh --e2e",
+    "test:coverage": "./scripts/run-tests.sh --coverage",
+    "test:watch": "./scripts/run-tests.sh --watch",
+    "test:verbose": "./scripts/run-tests.sh --verbose",
+    "test:ci": "./scripts/run-tests.sh --coverage",
+    "test:orchestrator": "./scripts/test-orchestrator-simple.sh",
+    "lint": "pnpm -r lint",
+    "clean": "pnpm -r clean && rm -rf node_modules",
+    "pm2:start": "cd packages/orchestrator && pnpm pm2:start",
+    "pm2:stop": "cd packages/orchestrator && pnpm pm2:stop",
+    "pm2:restart": "cd packages/orchestrator && pnpm pm2:restart",
+    "pm2:logs": "cd packages/orchestrator && pnpm pm2:logs",
+    "pm2:status": "cd packages/orchestrator && pnpm pm2:status",
+    "obs:serve": "python3 -m http.server 8080 --directory obs",
+    "docker:up": "docker-compose -f docker-compose.dev.yml up -d",
+    "docker:down": "docker-compose -f docker-compose.dev.yml down",
+    "docker:logs": "docker-compose -f docker-compose.dev.yml logs -f",
+    "validate:phase1": "./scripts/validate-phase1.sh",
+    "run:security": "./scripts/run-agents.sh security",
+    "run:quality": "./scripts/run-agents.sh quality",
+    "run:full-review": "./scripts/run-agents.sh full-review",
+    "integration:test": "./scripts/test-full-integration-simple.sh",
+    "security:test": "./scripts/test-security-agent.sh",
+    "review": "cd packages/cli && pnpm pit-agent review",
+    "review:commit": "cd packages/cli && pnpm pit-agent review --commit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.10.0",
+    "axios": "^1.13.1",
+    "eslint": "^8.55.0",
+    "husky": "^8.0.3",
+    "jest": "^30.2.0",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.1.0",
+    "ts-jest": "^29.4.5",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0",
+  "keywords": [
+    "multi-agent",
+    "code-review",
+    "security",
+    "quality",
+    "architecture",
+    "claude",
+    "anthropic",
+    "langgraph",
+    "pm2",
+    "pit-crew",
+    "f1-architecture"
+  ],
+  "author": "Felipe",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/felipe/pit-crew-multi-agent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/felipe/pit-crew-multi-agent/issues"
+  },
+  "pnpm": {
+    "overrides": {
+      "tree-sitter": "0.22.4",
+      "tree-sitter-typescript": "0.23.2",
+      "tree-sitter-javascript": "0.23.1",
+      "tree-sitter-python": "0.23.6"
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "name": "@pit-crew/orchestrator",
+  "version": "1.0.0",
+  "description": "LangGraph-based orchestrator for F1 Pit Stop multi-agent system",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop ecosystem.config.cjs",
+    "pm2:restart": "pm2 restart ecosystem.config.cjs",
+    "pm2:logs": "pm2 logs",
+    "pm2:status": "pm2 status",
+    "test": "tsx test/**/*.test.ts",
+    "lint": "eslint src/**/*.ts",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.3",
+    "@langchain/core": "^0.2.27",
+    "@langchain/langgraph": "^0.0.26",
+    "@pit-crew/shared": "workspace:*",
+    "@pm2/io": "^6.0.1",
+    "chokidar": "^3.6.0",
+    "dotenv": "^16.4.5",
+    "generic-pool": "^3.9.0",
+    "ioredis": "^5.8.2",
+    "langchain": "^0.2.9",
+    "node-cron": "^3.0.3",
+    "pm2": "^5.3.0",
+    "semver": "^7.6.0",
+    "simple-git": "^3.22.0",
+    "socket.io": "^4.7.5",
+    "socket.io-client": "^4.7.5",
+    "winston": "^3.11.0",
+    "winston-daily-rotate-file": "^5.0.0",
+    "yaml": "^2.4.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/generic-pool": "^3.8.3",
+    "@types/node": "^20.10.0",
+    "@types/node-cron": "^3.0.11",
+    "@types/semver": "^7.5.7",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "eslint": "^8.55.0",
+    "tsx": "^4.7.1",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "orchestrator",
+    "langgraph",
+    "multi-agent",
+    "workflow",
+    "state-machine",
+    "pit-crew"
+  ]
+}

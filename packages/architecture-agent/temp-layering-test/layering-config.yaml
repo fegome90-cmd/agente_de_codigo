@@ -1,0 +1,61 @@
+layers:
+  - name: presentation
+    paths:
+      - src/components/**
+      - src/controllers/**
+      - src/views/**
+    allowedImports:
+      - business
+      - infrastructure
+    forbiddenImports:
+      - presentation
+    allowedToImportFrom:
+      - business
+      - infrastructure
+    description: UI components and controllers
+  - name: business
+    paths:
+      - src/services/**
+      - src/domain/**
+      - src/core/**
+    allowedImports:
+      - business
+      - infrastructure
+    forbiddenImports:
+      - presentation
+    allowedToImportFrom:
+      - business
+      - infrastructure
+    description: Business logic and domain models
+  - name: infrastructure
+    paths:
+      - src/repositories/**
+      - src/database/**
+      - src/infrastructure/**
+      - src/api/**
+      - src/utils/**
+    allowedImports:
+      - infrastructure
+    forbiddenImports:
+      - presentation
+      - business
+    allowedToImportFrom:
+      - infrastructure
+    description: Data access and external services
+rules:
+  - fromLayer: presentation
+    toLayer: presentation
+    type: forbidden
+    description: Presentation layer should not import from itself
+  - fromLayer: business
+    toLayer: presentation
+    type: forbidden
+    description: Business layer should not depend on presentation
+  - fromLayer: infrastructure
+    toLayer: business
+    type: forbidden
+    description: Infrastructure should not depend on business logic
+  - fromLayer: infrastructure
+    toLayer: presentation
+    type: forbidden
+    description: Infrastructure should not depend on presentation

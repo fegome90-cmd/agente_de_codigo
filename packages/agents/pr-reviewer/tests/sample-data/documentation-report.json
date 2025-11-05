@@ -1,0 +1,81 @@
+{
+  "run_id": "documentation-ghi789",
+  "timestamp": "2024-01-15T10:40:00Z",
+  "agent": "documentation",
+  "scope": ["docs/**/*.yaml", "docs/**/*.json"],
+  "coverage": {
+    "total_documented_files": 18,
+    "total_files": 25,
+    "coverage_percentage": 72.0,
+    "documented_functions": 45,
+    "total_functions": 67
+  },
+  "api_validation": {
+    "openapi_files": ["docs/api/v1/openapi.yaml"],
+    "validation_errors": [
+      {
+        "file": "docs/api/v1/openapi.yaml",
+        "line": 156,
+        "error": "Schema reference '#/components/schemas/User' not found",
+        "severity": "error"
+      },
+      {
+        "file": "docs/api/v1/openapi.yaml",
+        "line": 234,
+        "error": "Missing required field 'description' in operation",
+        "severity": "warning"
+      }
+    ],
+    "breaking_changes": [
+      {
+        "type": "removed-endpoint",
+        "description": "Endpoint DELETE /api/v1/users/{id} has been removed",
+        "impact": "Clients relying on this endpoint will fail"
+      },
+      {
+        "type": "changed-response-schema",
+        "description": "Response schema for POST /api/v1/auth/login has changed",
+        "impact": "Client integrations may need updates"
+      }
+    ]
+  },
+  "changelog": {
+    "generated": "2024-01-15T10:40:00Z",
+    "entries": [
+      {
+        "version": "1.2.0",
+        "date": "2024-01-15",
+        "changes": [
+          "Add user authentication endpoints",
+          "Implement password reset functionality",
+          "Update API documentation"
+        ],
+        "type": "added"
+      },
+      {
+        "version": "1.1.2",
+        "date": "2024-01-12",
+        "changes": [
+          "Fix user profile update bug",
+          "Improve error handling"
+        ],
+        "type": "fixed"
+      }
+    ]
+  },
+  "quality_metrics": {
+    "readability_score": 78.5,
+    "completeness_score": 72.0,
+    "accuracy_score": 85.2
+  },
+  "recommendations": [
+    "Fix OpenAPI schema references",
+    "Add missing operation descriptions",
+    "Document breaking changes properly",
+    "Increase API documentation coverage"
+  ],
+  "summary": {
+    "overall_score": 78,
+    "status": "good"
+  }
+}

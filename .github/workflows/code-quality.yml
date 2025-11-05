@@ -1,0 +1,241 @@
+name: Code Quality Checks
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full git history for better analysis
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: "8.15.0"
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          python -m pip install --upgrade pip
+          pip install -e .[dev,security]
+
+      - name: TypeScript Code Quality
+        run: |
+          echo "🔍 Running TypeScript code quality checks..."
+
+          # ESLint
+          echo "Running ESLint..."
+          pnpm lint --format=json --output-file=eslint-report.json || true
+
+          # Prettier check
+          echo "Checking formatting..."
+          pnpm format:check || true
+
+          # TypeScript compilation
+          echo "Type checking..."
+          pnpm type-check
+
+      - name: Python Code Quality
+        run: |
+          echo "🐍 Running Python code quality checks..."
+
+          # Ruff (fast linter)
+          echo "Running Ruff..."
+          ruff check agents/ scripts/ --output-format=json > ruff-report.json || true
+
+          # Black formatting check
+          echo "Checking Black formatting..."
+          black --check --diff agents/ scripts/ || true
+
+          # isort import sorting
+          echo "Checking import sorting..."
+          isort --check-only --diff agents/ scripts/ || true
+
+          # mypy type checking
+          echo "Running mypy..."
+          mypy agents/ scripts/ --ignore-missing-imports --json-report mypy-report || true
+
+      - name: Security Analysis
+        run: |
+          echo "🔒 Running security analysis..."
+
+          # Python security
+          echo "Running Bandit..."
+          bandit -r agents/ scripts/ -f json -o bandit-report.json || true
+
+          echo "Running Safety..."
+          safety check --json --output safety-report.json || true
+
+          # Dependency audit
+          echo "Running npm audit..."
+          pnpm audit --json > npm-audit-report.json || true
+
+      - name: Complexity Analysis
+        run: |
+          echo "📊 Running complexity analysis..."
+
+          # Python complexity
+          lizard agents/ scripts/ -x "*/test_*" -x "*/tests/*" -o lizard-report.json || true
+
+          # TypeScript complexity (if tools available)
+          echo "TypeScript complexity analysis..."
+          # Add complexity tool for TypeScript if needed
+
+      - name: Test Coverage Analysis
+        run: |
+          echo "🧪 Running test coverage analysis..."
+
+          # Run tests with coverage
+          pnpm test:ci --coverage --coverage-report=json || true
+
+          # Python coverage
+          pytest tests/ --cov=agents --cov=scripts --cov-report=json || true
+
+      - name: Generate Quality Report
+        run: |
+          echo "📋 Generating quality report..."
+
+          # Create comprehensive quality report
+          cat > quality-report.md << 'EOF'
+          # Code Quality Report
+
+          ## Overview
+          Generated on: $(date)
+          Commit: ${{ github.sha }}
+          Branch: ${{ github.ref_name }}
+
+          ## Metrics Summary
+
+          ### TypeScript/JavaScript
+          - ESLint issues: $(cat eslint-report.json | jq '. | length' 2>/dev/null || echo "0")
+          - Type errors: $(pnpm type-check 2>&1 | grep -c "error" || echo "0")
+
+          ### Python
+          - Ruff issues: $(cat ruff-report.json | jq '. | length' 2>/dev/null || echo "0")
+          - Mypy errors: $(find mypy-report -name "*.json" -exec cat {} \; 2>/dev/null | jq '. | length' || echo "0")
+          - Bandit issues: $(cat bandit-report.json | jq '.results | length' 2>/dev/null || echo "0")
+          - Safety vulnerabilities: $(cat safety-report.json | jq '.vulnerabilities | length' 2>/dev/null || echo "0")
+
+          ### Coverage
+          - JS Coverage: $(cat coverage/coverage-summary.json | jq '.total.lines.pct' 2>/dev/null || echo "N/A")%
+          - Python Coverage: $(cat coverage.xml | grep -o 'line-rate="[^"]*"' | cut -d'"' -f2 | head -1 2>/dev/null || echo "N/A")
+
+          EOF
+
+      - name: Upload Quality Reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: quality-reports
+          path: |
+            quality-report.md
+            eslint-report.json
+            ruff-report.json
+            mypy-report/
+            bandit-report.json
+            safety-report.json
+            npm-audit-report.json
+            lizard-report.json
+            coverage/
+            htmlcov/
+
+      - name: Comment PR with Quality Results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Read quality report
+            const qualityReport = fs.readFileSync('quality-report.md', 'utf8');
+
+            // Create comment
+            const comment = `## 📊 Code Quality Results
+
+            ${qualityReport}
+
+            ---
+            *Generated by GitHub Actions*
+            `;
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existingComment = comments.find(comment =>
+              comment.body.includes('Code Quality Results') &&
+              comment.user.type === 'Bot'
+            );
+
+            // Create or update comment
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: comment,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment,
+              });
+            }
+
+      - name: Quality Gate Check
+        run: |
+          echo "🚦 Checking quality gates..."
+
+          # Define quality thresholds
+          ESLINT_THRESHOLD=10
+          RUFF_THRESHOLD=10
+          BANDIT_THRESHOLD=5
+          COVERAGE_THRESHOLD=80
+
+          # Check thresholds
+          eslint_issues=$(cat eslint-report.json | jq '. | length' 2>/dev/null || echo "0")
+          ruff_issues=$(cat ruff-report.json | jq '. | length' 2>/dev/null || echo "0")
+          bandit_issues=$(cat bandit-report.json | jq '.results | length' 2>/dev/null || echo "0")
+
+          # Fail if thresholds exceeded
+          if [ "$eslint_issues" -gt "$ESLINT_THRESHOLD" ]; then
+            echo "❌ ESLint issues ($eslint_issues) exceed threshold ($ESLINT_THRESHOLD)"
+            exit 1
+          fi
+
+          if [ "$ruff_issues" -gt "$RUFF_THRESHOLD" ]; then
+            echo "❌ Ruff issues ($ruff_issues) exceed threshold ($RUFF_THRESHOLD)"
+            exit 1
+          fi
+
+          if [ "$bandit_issues" -gt "$BANDIT_THRESHOLD" ]; then
+            echo "❌ Bandit issues ($bandit_issues) exceed threshold ($BANDIT_THRESHOLD)"
+            exit 1
+          fi
+
+          echo "✅ All quality gates passed!"

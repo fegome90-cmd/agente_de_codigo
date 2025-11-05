@@ -1,0 +1,467 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+env:
+  NODE_VERSION: "20.x"
+  PYTHON_VERSION: "3.11"
+  PNPM_VERSION: "8.15.0"
+
+jobs:
+  # Dependency caching
+  setup-cache:
+    name: Setup Cache
+    runs-on: ubuntu-latest
+    outputs:
+      cache-key: ${{ steps.cache-key.outputs.key }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate cache key
+        id: cache-key
+        run: |
+          KEY="cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml', '**/pyproject.toml') }}"
+          echo "key=$KEY" >> $GITHUB_OUTPUT
+          echo "Cache key: $KEY"
+
+  # TypeScript/JavaScript build and test
+  build-test-js:
+    name: Build & Test (TypeScript)
+    runs-on: ubuntu-latest
+    needs: setup-cache
+    outputs:
+      test-results: ${{ steps.test-results.outputs.results }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm type-check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build
+
+      - name: Run tests
+        id: test-results
+        run: |
+          pnpm test:ci --coverage --junit --outputFile=junit.xml
+          echo "results=test-results.xml" >> $GITHUB_OUTPUT
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results-js
+          path: |
+            junit.xml
+            coverage/
+            reports/
+
+  # Python build and test
+  build-test-python:
+    name: Build & Test (Python)
+    runs-on: ubuntu-latest
+    needs: setup-cache
+    outputs:
+      test-results: ${{ steps.test-results.outputs.results }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            python3-dev \
+            libyaml-dev \
+            libffi-dev \
+            libssl-dev
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev,test]
+
+      - name: Type check
+        run: mypy agents/ scripts/ --ignore-missing-imports
+
+      - name: Lint
+        run: |
+          ruff check agents/ scripts/
+          black --check agents/ scripts/
+          isort --check-only agents/ scripts/
+
+      - name: Security scan
+        run: |
+          bandit -r agents/ scripts/ -f json -o bandit-report.json
+          safety check --json --output safety-report.json
+
+      - name: Run tests
+        id: test-results
+        run: |
+          pytest tests/ \
+            --cov=agents \
+            --cov=scripts \
+            --cov-report=xml \
+            --cov-report=html \
+            --junit-xml=junit.xml \
+            --cov-fail-under=80
+          echo "results=test-results.xml" >> $GITHUB_OUTPUT
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: python-tests
+          name: codecov-python
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results-python
+          path: |
+            junit.xml
+            htmlcov/
+            bandit-report.json
+            safety-report.json
+
+  # Integration tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [build-test-js, build-test-python]
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      postgres:
+        image: postgres:15
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          python -m pip install --upgrade pip
+          pip install -e .[test]
+
+      - name: Build project
+        run: pnpm build
+
+      - name: Setup environment
+        run: |
+          cat > .env << EOF
+          NODE_ENV=test
+          DATABASE_URL=postgresql://postgres:test_password@localhost:5432/test_db
+          REDIS_URL=redis://localhost:6379
+          SECRET_KEY=test_secret_key_32_chars
+          JWT_SECRET=test_jwt_secret_32_chars
+          LOG_LEVEL=debug
+          EOF
+
+      - name: Run integration tests
+        run: |
+          # Start services in background
+          pnpm pm2:start &
+
+          # Wait for services to be ready
+          sleep 30
+
+          # Run integration tests
+          pnpm test:integration
+
+          # Cleanup
+          pnpm pm2:stop || true
+
+      - name: Upload integration test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: integration-test-results
+          path: |
+            integration-reports/
+            logs/
+
+  # Security scanning
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/init@v2
+        with:
+          languages: javascript, python
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+
+  # Performance benchmarks
+  performance-test:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: [build-test-js, build-test-python]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          node-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          python -m pip install --upgrade pip
+          pip install -e .[performance]
+
+      - name: Build project
+        run: pnpm build
+
+      - name: Run performance benchmarks
+        run: |
+          pnpm test:performance
+          python -m memory_profiler scripts/run_agents.py --benchmark
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-results
+          path: |
+            performance-reports/
+            benchmarks/
+
+  # Build Docker image
+  build-docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: [build-test-js, build-test-python, security-scan]
+    if: github.event_name == 'release'
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tag: ${{ steps.meta.outputs.tags }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix={{branch}}-
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Deploy (main branch only)
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: [build-test-js, build-test-python, integration-tests, security-scan]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    steps:
+      - name: Deploy to production
+        run: |
+          echo "🚀 Deploying to production..."
+          # Add your deployment commands here
+          # Example: kubectl apply -f k8s/
+          # Example: docker-compose up -d
+
+      - name: Run smoke tests
+        run: |
+          echo "🧪 Running smoke tests..."
+          # Add smoke test commands here
+          # Example: curl -f http://your-app/health
+
+  # Release
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build-test-js, build-test-python, build-docker]
+    if: github.event_name == 'release'
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Create release assets
+        run: |
+          # Create release archive
+          tar -czf agente-de-codigo-${{ github.event.release.tag_name }}.tar.gz \
+            --exclude=node_modules \
+            --exclude=.git \
+            --exclude=dist \
+            --exclude=.venv \
+            .
+
+      - name: Upload release assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./agente-de-codigo-${{ github.event.release.tag_name }}.tar.gz
+          asset_name: agente-de-codigo-${{ github.event.release.tag_name }}.tar.gz
+          asset_content_type: application/gzip
+
+  # Notify
+  notify:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: [build-test-js, build-test-python, integration-tests, security-scan]
+    if: always()
+    steps:
+      - name: Notify success
+        if: ${{ needs.build-test-js.result == 'success' && needs.build-test-python.result == 'success' }}
+        run: |
+          echo "✅ All tests passed successfully!"
+          # Add Slack/Discord notification here
+
+      - name: Notify failure
+        if: ${{ needs.build-test-js.result == 'failure' || needs.build-test-python.result == 'failure' }}
+        run: |
+          echo "❌ Some tests failed!"
+          # Add Slack/Discord notification here

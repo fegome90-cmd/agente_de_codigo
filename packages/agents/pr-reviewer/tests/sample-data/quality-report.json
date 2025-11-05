@@ -1,0 +1,106 @@
+{
+  "run_id": "quality-abc123",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "agent": "quality",
+  "scope": ["src/**/*.ts"],
+  "metrics": {
+    "total_files": 25,
+    "files_with_issues": 8,
+    "total_issues": 12,
+    "severity_breakdown": {
+      "error": 2,
+      "warning": 6,
+      "info": 4
+    },
+    "complexity_metrics": {
+      "average_cyclomatic": 7.5,
+      "max_cyclomatic": 18,
+      "high_complexity_functions": 3
+    },
+    "duplication_metrics": {
+      "duplicated_lines": 85,
+      "duplication_percentage": 12.3,
+      "duplicate_blocks": 2
+    },
+    "test_coverage": {
+      "line_coverage": 78.5,
+      "branch_coverage": 65.2,
+      "function_coverage": 82.1
+    }
+  },
+  "findings": [
+    {
+      "file": "src/auth/user-service.ts",
+      "line": 123,
+      "column": 3,
+      "severity": "error",
+      "rule": "no-unused-vars",
+      "message": "'unusedToken' is defined but never used",
+      "suggestion": "Remove unused variable or use it in the implementation"
+    },
+    {
+      "file": "src/utils/validation.ts",
+      "line": 45,
+      "column": 8,
+      "severity": "error",
+      "rule": "no-console",
+      "message": "Unexpected console statement",
+      "suggestion": "Use proper logging framework instead of console.log"
+    },
+    {
+      "file": "src/api/routes.ts",
+      "line": 67,
+      "column": 12,
+      "severity": "warning",
+      "rule": "max-lines-per-function",
+      "message": "Function 'handleRequest' has too many lines (75)",
+      "suggestion": "Consider splitting this function into smaller functions"
+    },
+    {
+      "file": "src/database/connection.ts",
+      "line": 23,
+      "column": 5,
+      "severity": "warning",
+      "rule": "complexity",
+      "message": "Function has cyclomatic complexity of 18",
+      "suggestion": "Refactor to reduce complexity using early returns or extract methods"
+    },
+    {
+      "file": "src/models/user.ts",
+      "line": 89,
+      "column": 10,
+      "severity": "warning",
+      "rule": "@typescript-eslint/no-explicit-any",
+      "message": "Unexpected any. Specify a more specific type",
+      "suggestion": "Define proper TypeScript interface for the data structure"
+    },
+    {
+      "file": "src/helpers/formatters.ts",
+      "line": 156,
+      "column": 7,
+      "severity": "warning",
+      "rule": "no-duplicate-imports",
+      "message": "Duplicate import of 'formatDate'",
+      "suggestion": "Remove duplicate import statement"
+    },
+    {
+      "file": "src/controllers/user.ts",
+      "line": 34,
+      "column": 15,
+      "severity": "info",
+      "rule": "@typescript-eslint/explicit-function-return-type",
+      "message": "Missing return type on function",
+      "suggestion": "Add explicit return type annotation"
+    }
+  ],
+  "summary": {
+    "score": 75,
+    "grade": "C",
+    "recommendations": [
+      "Remove unused variables and console statements",
+      "Reduce function complexity in database connection",
+      "Add proper TypeScript types",
+      "Improve test coverage above 80%"
+    ]
+  }
+}

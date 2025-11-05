@@ -1,0 +1,129 @@
+{
+  "run_id": "architecture-def456",
+  "timestamp": "2024-01-15T10:35:00Z",
+  "agent": "architecture",
+  "scope": ["src/**/*.ts"],
+  "analysis": {
+    "layers": [
+      {
+        "name": "controllers",
+        "files": ["src/controllers/user.ts", "src/controllers/auth.ts"],
+        "violations": [
+          {
+            "type": "business-logic-in-controller",
+            "description": "Controller contains business logic that should be in service layer",
+            "file": "src/controllers/user.ts",
+            "line": 78,
+            "severity": "warning"
+          }
+        ]
+      },
+      {
+        "name": "services",
+        "files": ["src/services/user-service.ts", "src/services/auth-service.ts"],
+        "violations": [
+          {
+            "type": "direct-database-access",
+            "description": "Service layer accessing database directly without repository pattern",
+            "file": "src/services/user-service.ts",
+            "line": 45,
+            "severity": "error"
+          }
+        ]
+      },
+      {
+        "name": "models",
+        "files": ["src/models/user.ts", "src/models/auth.ts"],
+        "violations": []
+      }
+    ],
+    "patterns": {
+      "detected": [
+        {
+          "pattern": "repository-pattern",
+          "files": ["src/repositories/user-repository.ts"],
+          "confidence": 0.85
+        },
+        {
+          "pattern": "dependency-injection",
+          "files": ["src/container.ts", "src/services/user-service.ts"],
+          "confidence": 0.92
+        }
+      ],
+      "missing": [
+        "circuit-breaker-pattern",
+        "observer-pattern"
+      ]
+    },
+    "dependencies": {
+      "circular_dependencies": [
+        {
+          "files": ["src/utils/logger.ts", "src/config/app.ts"],
+          "description": "Circular dependency between logger and app configuration"
+        }
+      ],
+      "high_coupling": [
+        {
+          "file": "src/services/user-service.ts",
+          "dependencies": ["src/database", "src/utils", "src/config", "src/models"],
+          "coupling_score": 0.78
+        }
+      ]
+    },
+    "dry_violations": [
+      {
+        "type": "duplicate-validation-logic",
+        "duplicated_code": "email validation function",
+        "locations": [
+          {
+            "file": "src/utils/validation.ts",
+            "start_line": 23,
+            "end_line": 35
+          },
+          {
+            "file": "src/services/auth-service.ts",
+            "start_line": 67,
+            "end_line": 79
+          }
+        ]
+      }
+    ]
+  },
+  "recommendations": [
+    {
+      "priority": "high",
+      "category": "layering",
+      "description": "Move business logic from controllers to service layer",
+      "file": "src/controllers/user.ts",
+      "effort_estimate": "2 hours"
+    },
+    {
+      "priority": "high",
+      "category": "patterns",
+      "description": "Implement repository pattern for data access",
+      "file": "src/services/user-service.ts",
+      "effort_estimate": "4 hours"
+    },
+    {
+      "priority": "medium",
+      "category": "dependencies",
+      "description": "Resolve circular dependency between logger and app config",
+      "effort_estimate": "1 hour"
+    },
+    {
+      "priority": "medium",
+      "category": "dry",
+      "description": "Extract common validation logic to shared utility",
+      "effort_estimate": "1 hour"
+    }
+  ],
+  "summary": {
+    "health_score": 72,
+    "critical_issues": 1,
+    "improvement_areas": [
+      "Service layer architecture",
+      "Dependency management",
+      "Code duplication"
+    ]
+  }
+}
